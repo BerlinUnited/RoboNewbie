@@ -798,39 +798,64 @@ public class PerceptorInput {
    * data which cannot be converted
    * 
    */
-	private void parseHear(SymbolNode node)
-			throws PerceptorConversionException
-	{
-		double time;
+    private void parseHear(SymbolNode node)
+            throws PerceptorConversionException {
+        
+        double time;
         double direction;
-		String heardMessage = "";
+        StringBuilder heardMessage = new StringBuilder();
 
-		// Sanity checks
-		  if (node.children.length < 4) {
-      throw new PerceptorConversionException("Malformed hear node: "
-              + node.toString());
-    }
-
-    try {
-      if (!((String) node.children[2]).equals("self")) {
-        time = Double.parseDouble((String) node.children[1]);
-        direction = Double.parseDouble((String) node.children[2]);
-
-        // Concatenate following nodes
-        for (int i = 3; i < node.children.length; i++) {
-          if (i > 3) {
-            heardMessage += " " + node.children[i];
-          } else {
-            heardMessage += node.children[i];
-          }
+        int idx = 0;
+        
+        // Sanity checks
+        if (node.children.length < 3) {
+            throw new PerceptorConversionException("Malformed hear node: "
+                    + node.toString());
         }
-        hears.add(new HearPerceptor(time, direction, heardMessage));
-      }
-    } catch (Exception e) {
-      throw new PerceptorConversionException(
-              "Malformed hear node, conversion error: " + node.toString());
+
+        // parse argument 0 (should allways be "hear")
+        // another sanity check
+        if (!((String) node.children[idx++]).equals("hear")) {
+            throw new PerceptorConversionException("Malformed hear node: "
+                    + node.toString());
+        }
+        
+        try {
+
+            // try parse time
+            // HACK
+            try {
+                time = Double.parseDouble((String) node.children[idx]);
+                idx++;
+            } catch (NumberFormatException ex) {
+                // NOTE: new in SimSpark 0.6.10
+                // do nothing with it
+                String team = (String) node.children[idx++];
+                time = Double.parseDouble((String) node.children[idx++]);
+            }
+
+            // parse direction
+            if(((String) node.children[idx++]).equals("self")) {
+                return; // don't parse own messages
+            } else {
+                direction = Double.parseDouble((String) node.children[idx++]);
+            } 
+
+            // read the rest of the message
+            // Concatenate following nodes
+            if(idx < node.children.length) {
+                heardMessage.append(node.children[idx++]);
+            }
+            while(idx < node.children.length) {
+                heardMessage.append(" ").append(node.children[idx++]);
+            }
+        
+            hears.add(new HearPerceptor(time, direction, heardMessage.toString()));
+        } catch (Exception e) {
+            throw new PerceptorConversionException(
+                    "Malformed hear node, conversion error: " + node.toString());
+        }
     }
-  }
 
   /**
    * Internal method for parsing the server message. 
@@ -845,7 +870,7 @@ public class PerceptorInput {
    */
 	private void parseGameState(SymbolNode node)
 			throws PerceptorConversionException
-	{
+	{      
 		double time = 0;
         GameStateConsts.PlayMode playMode = null;
 
@@ -868,6 +893,10 @@ public class PerceptorInput {
             String pm = ( String) child.children[1];
             playMode = GameStateConsts.getPlayMode(pm);
             break;
+          case "sl":
+              break; //TODO
+          case "sr":
+              break; //TODO
           case "unum": 
             id = (String) child.children[1];
             break;          
