@@ -94,8 +94,9 @@ public class EffectorOutput {
         builder.append('(').append(RobotConsts.getEffectorID(i)).append(' ')
                 .append(jointCommands.get(i)).append(')');
     }
-    if (sayMessage != null)
-      builder.append("(say "+ sayMessage +")");
+    if (sayMessage != null) {
+      builder.append("(say ").append(sayMessage).append(")");
+    }
             
     builder.append("(syn)");
     
@@ -146,7 +147,7 @@ public class EffectorOutput {
    * 
    * To send the jointCommands, call method sendAgentMessage().
    * 
-   * @param jointCommands Holds 22 "motor" velocities, one for every joint, in 
+   * @param commands Holds 22 "motor" velocities, one for every joint, in 
    * the order specified by class RobotConsts in package util. The unit of a 
    * command is radians per second. If there are less then 22 values in the 
    * passed array, a runtime error occurs. If there are more values, they are 
@@ -159,8 +160,9 @@ public class EffectorOutput {
    * @see util.RobotConsts#JointsCount
    */
   public void setAllJointCommands(double[] commands) {
-    for (int i = 0; i < RobotConsts.JointsCount; i++)
+    for (int i = 0; i < RobotConsts.JointsCount; i++) {
       jointCommands.put(i, commands[i]);
+    }
   }
   
 }
