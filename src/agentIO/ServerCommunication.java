@@ -152,7 +152,7 @@ public class ServerCommunication {
      * at its initial position.
      */
     public void initRobot(String robotID, String team, double beamCoordsX, double beamCoordsY, double beamCoordsRot) {
-        sendAgentMessage("(scene rsg/agent/naov4/nao.rsg)(syn)");
+        sendAgentMessage("(scene rsg/agent/nao/nao.rsg)(syn)");
         getServerMessage();
         
         sendAgentMessage("(init (unum " + robotID + ")(teamname " + team + "))(syn)");
