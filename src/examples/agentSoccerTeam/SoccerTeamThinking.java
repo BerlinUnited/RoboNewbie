@@ -54,7 +54,7 @@ public class SoccerTeamThinking {
      * Must be updated for new or changing roles.
      */
     SimpleGoalie role1;
-    SimpleSoccer_Plovdiv2014 role2;
+    SimpleAttacker role2;
     SimpleSoccer role3;
     SimpleSoccer_withKick role4;
     SimpleSoccer role_d;
@@ -119,7 +119,7 @@ public class SoccerTeamThinking {
                 role1 = new SimpleGoalie(motion, percIn, log);
                 break;
             case "2":
-                role2 = new SimpleSoccer_Plovdiv2014(motion, percIn, log);
+                role2 = new SimpleAttacker(motion, percIn, log);
                 break;
             case "3":
                 role3 = new SimpleSoccer(motion, percIn, log);
