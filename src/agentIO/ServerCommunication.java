@@ -297,6 +297,7 @@ public class ServerCommunication {
     }
 
     /**
+     * Heinrich 
      * Exception thrown when the connection was closed by the server.
      * @see getServerMessage()
      * @see sendAgentMessage(String msg)
