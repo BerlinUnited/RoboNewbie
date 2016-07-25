@@ -66,15 +66,23 @@ public class Agent_ParallelTest
     double speed = 5.0;
     
     double body_shift = 0.2;
-
-    double body_height = -0.7;
+    SmoothParameter body_height = new SmoothParameter(0, -0.7, 0.01);
+    
     double step_height = -0.4;
-    double step_length_x = 0.0;
-    double step_length_y = 0.1;
+    SmoothParameter step_length_x = new SmoothParameter(0, 0.2, 0.01);
+    SmoothParameter step_length_y = new SmoothParameter(0, 0, 0.01);
+    SmoothParameter step_rotation = new SmoothParameter(0, -0, 0.01);
+    
+    InertialFilter inertial = new InertialFilter(in);
+    
+    boolean stabilization = true;
+    double lastX = 0;
+    double lastY = 0;
     
     while(true)
     {
         in.update();
+        inertial.update();
         
         // initialize at the first run
         if(lastServerTime == -1) {
@@ -83,39 +91,138 @@ public class Agent_ParallelTest
         
         // time since the last execution
         double timeDelta = in.getServerTime() - lastServerTime;
-        lastServerTime = in.getServerTime();        
-
+        lastServerTime = in.getServerTime();
+        
+        
+        // update parameters
+        body_height.update();
+        step_length_x.update();
+        step_length_y.update();
+        step_rotation.update();
+        
+        // 
         t += speed*timeDelta;
             
         double y = body_shift * Math.sin(t);
-        double z = body_height + step_height * (1.0-Math.cos(2.0*t))*0.5;
+        double z = body_height.value() + step_height * (1.0-Math.cos(2.0*t))*0.5;
 
-        double step_left_x = step_length_x * Math.sin(t + Math.PI*0.5);
-        double step_left_y = step_length_y * (1+Math.sin(t + Math.PI*0.5))*0.5;        
+        double step_left_x = step_length_x.value() * Math.sin(t + Math.PI*0.5);
+        double step_left_y = step_length_y.value() * (1+Math.sin(t + Math.PI*0.5))*0.5;
+        
+        double step_left_r =  -step_rotation.value() * (1+Math.sin(t + Math.PI*0.5))*0.5;
+        double step_right_r =  step_rotation.value() * (1+Math.sin(t + Math.PI*1.5))*0.5;
+        double step_r = (step_rotation.value() > 0)?step_left_r:step_right_r;
+        
         
         // calculate pose for the left foot
         left.x = step_left_x;
         left.y = y + step_left_y;
-        left.z = (y < 0)?z:body_height;
-                
-        double step_right_x = step_length_x * Math.sin(t + Math.PI*1.5);
-        double step_right_y = step_length_y * (1.0+Math.sin(t + Math.PI*1.5))*0.5;
+        left.z = (y < 0)?z:body_height.value();
+        left.az = step_r;
+        
+        if(stabilization) {
+            left.x -= -inertial.getY() + (inertial.getY()-lastY)*0.2;
+            left.y -= inertial.getX() - (inertial.getX()-lastX)*0.2;
+            //left.z -= left.ax;
+        }
+        
+        double step_right_x = step_length_x.value() * Math.sin(t + Math.PI*1.5);
+        double step_right_y = step_length_y.value() * (1.0+Math.sin(t + Math.PI*1.5))*0.5;
         
         // calculate pose for the right foot
         right.x = step_right_x;
         right.y = y + step_right_y;
-        right.z = (y > 0)?z:body_height;
-                        
+        right.z = (y > 0)?z:body_height.value();
+        right.az = step_r;
+        
+        if(stabilization) {
+            right.x -= -inertial.getY() + (inertial.getY()-lastY)*0.2;
+            right.y -= inertial.getX() - (inertial.getX()-lastX)*0.2;
+            //right.z += right.ax;
+        }
+        
+        /*
+        // rocking
+        left.ay = Math.sin(t)*0.1;
+        //left.ax = -Math.sin(t)*0.1;
+        left.z = body_height.value() + left.ax;
+        
+        // rocking
+        right.ay = Math.sin(t)*0.1;
+        //right.ax = -Math.sin(t)*0.1;
+        right.z = body_height.value() - right.ax;
+        */
+        
         // calculate the leg joint angles according to the parallel kinematic
         double[] jointData = calculateJoints(left, right);
-                
+        
+        if(stabilization) {
+            jointData[RobotConsts.LeftShoulderPitch] = - inertial.getY() - inertial.getX();
+            jointData[RobotConsts.RightShoulderPitch] = - inertial.getY() + inertial.getX();
+        }
+        
         positionControl.setAllJointPositions(jointData);
+        lastX = inertial.getX();
+        lastY = inertial.getY();
         positionControl.update(); 
         out.sendAgentMessage();
     }
   }
-    
-
+  
+  
+  
+  class InertialFilter {
+      private double x;
+      private double y;
+      private final PerceptorInput in;
+      
+      InertialFilter(PerceptorInput in) {
+          this.in = in;
+      }
+      
+      public void update() {
+          
+          //System.out.println(in.getAcc().getX() + ", " + in.getAcc().getY() + ", " + in.getAcc().getZ());
+          double ax = Math.atan2(in.getAcc().getY(), in.getAcc().getZ());
+          double ay = Math.atan2(in.getAcc().getX(), in.getAcc().getZ());
+          
+          double gx = Math.toRadians(in.getGyro().getY())*0.02; 
+          double gy = Math.toRadians(in.getGyro().getX())*0.02;
+          
+          double alpha = 0.02;
+          
+          x = (1.0-alpha)*(x + gx) + alpha*ax;
+          y = (1.0-alpha)*(y + gy) + alpha*ay;
+      }
+      
+      double getX() { return x; }
+      double getY() { return y; }
+  }
+  
+  class SmoothParameter {
+      private double targetValue;
+      private double currentValue;
+      private final double alpha;
+      
+      public SmoothParameter(double initial, double target, double alpha) {
+          this.currentValue = initial;
+          this.targetValue = target;
+          this.alpha = alpha;
+      }
+      
+      public void update() {
+          currentValue = (1.0-alpha)*currentValue + alpha*targetValue;
+      }
+      
+      public double value() {
+          return currentValue;
+      }
+      
+      public void setTarget(double target) {
+          targetValue = target;
+      }
+  }
+  
   private class Pose {
       // foot position
       double x;
